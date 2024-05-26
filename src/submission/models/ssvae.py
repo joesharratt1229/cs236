@@ -85,12 +85,19 @@ class SSVAE(nn.Module):
         y = np.repeat(np.arange(self.y_dim), x.size(0))
         y = x.new(np.eye(self.y_dim)[y])
         x = ut.duplicate(x, self.y_dim)
-        ### START CODE HERE ###
-        ### END CODE HERE ###
-        ################################################################################
-        # End of code modification
-        ################################################################################
-        raise NotImplementedError
+        m , v = self.enc(x, y)
+        z = ut.sample_gaussian(m, v)
+        logits = self.dec(z, y)
+
+        kl_y = (ut.kl_cat(y_prob, y_logprob, np.log(1.0/ self.y_dim))).mean()
+        kl_z = ut.kl_normal(m, v, self.z_prior[0], self.z_prior[1])
+        rec = -ut.log_bernoulli_with_logits(x, logits)
+
+        rec = ((y_prob.t() * rec.reshape(self.y_dim, -1)).sum(0)).mean()
+        kl_z = ((y_prob.t() * kl_z.reshape(self.y_dim, -1)).sum(0)).mean()
+
+        nelbo = rec + kl_z + kl_y
+        return nelbo, kl_z, kl_y, rec
 
     def classification_cross_entropy(self, x, y):
         y_logits = self.cls(x)
