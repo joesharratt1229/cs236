@@ -62,7 +62,7 @@ class VAE(nn.Module):
         nelbo = kl + rec
         return nelbo.mean(), kl.mean(), rec.mean()
         
-
+        
     def negative_iwae_bound(self, x, iw):
         """
         Computes the Importance Weighted Autoencoder Bound
@@ -109,7 +109,8 @@ class VAE(nn.Module):
         nelbo = kl + rec
         niwae = -ut.log_mean_exp(-nelbo.reshape(iw, -1), dim = 0)
 
-        return niwae.mean(), kl.mean(), rec.mean()
+        return niwae.mean(), kl.mean(), rec.mean() 
+
 
     def loss(self, x):
         nelbo, kl, rec = self.negative_elbo_bound(x)
