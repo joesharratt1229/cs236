@@ -58,7 +58,24 @@ class FSVAE(nn.Module):
         ################################################################################
         # End of code modification
         ################################################################################
-        raise NotImplementedError
+        m, v = self.enc(x, y)
+        z = ut.sample_gaussian(m, v)
+
+        # generate x given z,y
+        x_logits = self.dec(z, y)
+
+        # kl on q(z)
+        kl_z = ut.kl_normal(m, v, self.z_prior[0], self.z_prior[1])
+
+
+        rec_loss = -ut.log_normal(x, x_logits, 0.1 * torch.ones_like(x_logits))
+        kl_z, rec_loss = rec_loss.mean(), kl_z.mean()
+        nelbo = rec_loss + kl_z
+
+        ################################################################################
+        # End of code modification
+        ################################################################################
+        return nelbo, kl_z, rec_loss
 
     def loss(self, x, y):
         nelbo, kl_z, rec = self.negative_elbo_bound(x, y)

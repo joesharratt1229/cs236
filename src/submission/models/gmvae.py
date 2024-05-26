@@ -27,63 +27,20 @@ class GMVAE(nn.Module):
                                         / np.sqrt(self.k * self.z_dim))
         # Uniform weighting
         self.pi = torch.nn.Parameter(torch.ones(k) / k, requires_grad=False)
-
-    def negative_elbo_bound(self, x):
-        """
-        Computes the Evidence Lower Bound, KL and, Reconstruction costs
-
-        Args:
-            x: tensor: (batch, dim): Observations
-
-        Returns:
-            nelbo: tensor: (): Negative evidence lower bound
-            kl: tensor: (): ELBO KL divergence to prior
-            rec: tensor: (): ELBO Reconstruction term
-        """
-        ################################################################################
-        # TODO: Modify/complete the code here
-        # Compute negative Evidence Lower Bound and its KL and Rec decomposition
-        #
-        # To help you start, we have computed the mixture of Gaussians prior
-        # prior = (m_mixture, v_mixture) for you, where
-        # m_mixture and v_mixture each have shape (1, self.k, self.z_dim)
-        #
-        # Note that nelbo = kl + rec
-        #
-        # Outputs should all be tensor scalars
-        #
-        # Return:
-        #   nelbo, kl_z, rec
-        ################################################################################
-        # We provide the learnable prior for you. Familiarize yourself with
-        # this object by checking its shape.
-        prior = ut.gaussian_parameters(self.z_pre, dim=1)
-        prior_m, prior_v = prior
-
-        batch = x.shape[0]
-
-
-        qm, qv = self.enc.encode(x)
-        # Now draw Zs from the posterior qm/qv
-        z = ut.sample_gaussian(qm,qv)
-
-        l_posterior = ut.log_normal(z, qm, qv)
-        multi_m = prior_m.expand(batch, *prior_m.shape[1:])
-        multi_v = prior_v.expand(batch, *prior_v.shape[1:])
-        l_prior = ut.log_normal_mixture(z, multi_m, multi_v)
-        kls = l_posterior - l_prior
-        kl = torch.mean(kls)
-
-        probs = self.dec.decode(z)
-        recs = ut.log_bernoulli_with_logits(x, probs)
-        rec = -1.0 * torch.mean(recs)
-
-        nelbo = kl + rec
-        ################################################################################
-        # End of code modification
-        ################################################################################
-        return nelbo, kl, rec
         
+        
+    def negative_elbo_bound(self, x):
+        prior = ut.gaussian_parameters(self.z_pre, dim=1)
+
+        m, v = self.enc(x)
+        z = ut.sample_gaussian(m, v)
+        logits = self.dec(z)
+        kl = ut.log_normal(z, m, v) - ut.log_normal_mixture(z, *prior)
+        rec = -ut.log_bernoulli_with_logits(x, logits)
+        nelbo = kl + rec
+        nelbo, kl, rec = nelbo.mean(), kl.mean(), rec.mean()
+        return nelbo, kl, rec
+
 
     def negative_iwae_bound(self, x, iw):
         """

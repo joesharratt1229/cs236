@@ -121,16 +121,16 @@ def log_normal_mixture(z, m, v):
     # in the batch
     ################################################################################
     ### START CODE HERE ###
-    std = torch.sqrt(torch.abs(v))
-    log_probs = -0.5 * torch.log(2 * torch.pi * std ** 2) - ((z.unsqueeze(1) - m) ** 2) / (2 * std ** 2)
+    z = z.unsqueeze(1)
+    # compute prob for each gaussian mixed.
+    log_prob_mix = log_normal(z, m, v)
+    # (batch , mix) -> (batch ,)
+    log_prob = log_mean_exp(log_prob_mix, dim=-1)
 
-    max_log_probs = torch.max(log_probs, dim=1, keepdim=True).values
-    log_sum_exp = torch.log(torch.sum(torch.exp(log_probs - max_log_probs), dim=1)) + max_log_probs.squeeze(1)
-    ### END CODE HERE ###
     ################################################################################
     # End of code modification
     ################################################################################
-    return log_sum_exp
+    return log_prob
 
 
 
