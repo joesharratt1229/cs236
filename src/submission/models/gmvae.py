@@ -58,12 +58,32 @@ class GMVAE(nn.Module):
         # We provide the learnable prior for you. Familiarize yourself with
         # this object by checking its shape.
         prior = ut.gaussian_parameters(self.z_pre, dim=1)
-        ### START CODE HERE ###
-        ### END CODE HERE ###
+        prior_m, prior_v = prior
+
+        batch = x.shape[0]
+
+
+        qm, qv = self.enc.encode(x)
+        # Now draw Zs from the posterior qm/qv
+        z = ut.sample_gaussian(qm,qv)
+
+        l_posterior = ut.log_normal(z, qm, qv)
+        multi_m = prior_m.expand(batch, *prior_m.shape[1:])
+        multi_v = prior_v.expand(batch, *prior_v.shape[1:])
+        l_prior = ut.log_normal_mixture(z, multi_m, multi_v)
+        kls = l_posterior - l_prior
+        kl = torch.mean(kls)
+
+        probs = self.dec.decode(z)
+        recs = ut.log_bernoulli_with_logits(x, probs)
+        rec = -1.0 * torch.mean(recs)
+
+        nelbo = kl + rec
         ################################################################################
         # End of code modification
         ################################################################################
-        raise NotImplementedError
+        return nelbo, kl, rec
+        
 
     def negative_iwae_bound(self, x, iw):
         """
@@ -92,12 +112,19 @@ class GMVAE(nn.Module):
         # We provide the learnable prior for you. Familiarize yourself with
         # this object by checking its shape.
         prior = ut.gaussian_parameters(self.z_pre, dim=1)
-        ### START CODE HERE ###
-        ### END CODE HERE ###
-        ################################################################################
-        # End of code modification
-        ################################################################################
-        raise NotImplementedError
+        m , v = self.enc(x)
+
+        weighted_m , weighted_v , weighted_x = ut.duplicate(m, iw), ut.duplicate(v, iw), ut.duplicate(x, iw)
+
+        weighted_z = ut.sample_gaussian(weighted_m, weighted_v)
+        weighted_logits = self.dec(weighted_z)
+        kl = ut.log_normal(weighted_z, weighted_m , weighted_v) - ut.log_normal_mixture(weighted_z, prior[0], prior[1])
+        rec = - ut.log_bernoulli_with_logits(weighted_x, weighted_logits)
+
+        nelbo = kl + rec
+        niwae = -ut.log_mean_exp(-nelbo.reshape(iw, -1), dim = 0)
+
+        return niwae.mean(), kl.mean(), rec.mean()
 
     def loss(self, x):
         nelbo, kl, rec = self.negative_elbo_bound(x)

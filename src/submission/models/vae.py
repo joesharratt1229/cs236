@@ -52,7 +52,16 @@ class VAE(nn.Module):
         ################################################################################
         # End of code modification
         ################################################################################
-        raise NotImplementedError
+        m , v = self.enc(x)
+        z = ut.sample_gaussian(m, v)
+        logits = self.dec(z)
+        prior_mean , prior_variance = self.z_prior
+        kl = ut.kl_normal(m, v, prior_mean, prior_variance)
+        rec = -ut.log_bernoulli_with_logits(x, logits)
+
+        nelbo = kl + rec
+        return nelbo.mean(), kl.mean(), rec.mean()
+        
 
     def negative_iwae_bound(self, x, iw):
         """
@@ -87,7 +96,20 @@ class VAE(nn.Module):
         ################################################################################
         # End of code modification
         ################################################################################
-        raise NotImplementedError
+        prior_mean , prior_variance = self.z_prior
+        m , v = self.enc(x)
+
+        weighted_m , weighted_v , weighted_x = ut.duplicate(m, iw), ut.duplicate(v, iw), ut.duplicate(x, iw)
+
+        weighted_z = ut.sample_gaussian(weighted_m, weighted_v)
+        weighted_logits = self.dec(weighted_z)
+        kl = ut.log_normal(weighted_z, weighted_m , weighted_v) - ut.log_normal_mixture(weighted_z, prior_mean, prior_variance)
+        rec = - ut.log_bernoulli_with_logits(weighted_x, weighted_logits)
+
+        nelbo = kl + rec
+        niwae = -ut.log_mean_exp(-nelbo.reshape(iw, -1), dim = 0)
+
+        return niwae.mean(), kl.mean(), rec.mean()
 
     def loss(self, x):
         nelbo, kl, rec = self.negative_elbo_bound(x)

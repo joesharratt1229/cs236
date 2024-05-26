@@ -58,7 +58,13 @@ def sample_gaussian(m, v):
     ################################################################################
     # End of code modification
     ################################################################################
-    raise NotImplementedError
+    epsilon = torch.randn_like(m)
+    std = torch.sqrt(v)
+    z = m + std * epsilon
+    return z
+    
+    
+    
 
 
 def log_normal(x, m, v):
@@ -87,11 +93,14 @@ def log_normal(x, m, v):
     # the last dimension
     ################################################################################
     ### START CODE HERE ###
+    std = torch.sqrt(torch.abs(v))
+    log_prob = -0.5 * torch.log(2 * torch.pi * std ** 2) - ((x - m) ** 2) / (2 * std ** 2)
+    log_prob_sum = torch.sum(log_prob, dim=-1)
     ### END CODE HERE ###
     ################################################################################
     # End of code modification
     ################################################################################
-    raise NotImplementedError
+    return log_prob_sum
 
 
 def log_normal_mixture(z, m, v):
@@ -112,11 +121,18 @@ def log_normal_mixture(z, m, v):
     # in the batch
     ################################################################################
     ### START CODE HERE ###
+    std = torch.sqrt(torch.abs(v))
+    log_probs = -0.5 * torch.log(2 * torch.pi * std ** 2) - ((z.unsqueeze(1) - m) ** 2) / (2 * std ** 2)
+
+    max_log_probs = torch.max(log_probs, dim=1, keepdim=True).values
+    log_sum_exp = torch.log(torch.sum(torch.exp(log_probs - max_log_probs), dim=1)) + max_log_probs.squeeze(1)
     ### END CODE HERE ###
     ################################################################################
     # End of code modification
     ################################################################################
-    raise NotImplementedError
+    return log_sum_exp
+
+
 
 
 def gaussian_parameters(h, dim=-1):
